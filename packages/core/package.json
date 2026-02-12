@@ -1,0 +1,17 @@
+{
+  "name": "@editneo/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/store.ts",
+  "types": "./src/store.ts",
+  "dependencies": {
+    "zustand": "^4.5.1",
+    "uuid": "^9.0.1",
+    "immer": "^10.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/uuid": "^9.0.8",
+    "@types/node": "^20.11.24"
+  }
+}

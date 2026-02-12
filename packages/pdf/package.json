@@ -1,0 +1,15 @@
+{
+  "name": "@editneo/pdf",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/worker.ts",
+  "types": "./src/worker.ts",
+  "dependencies": {
+    "pdfjs-dist": "3.11.174",
+    "@editneo/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/pdfjs-dist": "^2.10.378"
+  }
+}
