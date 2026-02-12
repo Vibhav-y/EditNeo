@@ -1,14 +1,16 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
+import { WebsocketProvider } from 'y-websocket';
 import { useEditorStore, NeoBlock } from '@editneo/core';
 
 export class SyncManager {
   doc: Y.Doc;
-  yBlocks: Y.Map<NeoBlock>;
+  yBlocks: Y.Map<any>; // yjs map stores plain objects, not strictly NeoBlock typed inside
   yRoot: Y.Array<string>;
   provider: IndexeddbPersistence;
+  wsProvider?: WebsocketProvider;
 
-  constructor(docId: string = 'default') {
+  constructor(docId: string = 'default', syncConfig?: { url: string; room: string }) {
     this.doc = new Y.Doc();
     this.yBlocks = this.doc.getMap('blocks');
     this.yRoot = this.doc.getArray('rootBlocks');
@@ -16,43 +18,74 @@ export class SyncManager {
     // Offline persistence
     this.provider = new IndexeddbPersistence(`editneo-document-${docId}`, this.doc);
     
+    // WebSocket Sync
+    if (syncConfig) {
+      this.wsProvider = new WebsocketProvider(syncConfig.url, syncConfig.room, this.doc);
+      
+      this.wsProvider.on('status', (event: any) => {
+        console.log('Sync status:', event.status); // 'connected' or 'disconnected'
+      });
+    }
+
     this.setupObservers();
-    this.syncStoreToYjs(); // Initial sync logic if needed, or rely on observers
   }
 
   setupObservers() {
     // 1. Listen to Yjs changes and update Zustand
     this.yBlocks.observe((event) => {
-      // In a real app, calculate diffs carefully.
-      // For MVP, we can just resync the whole state or use the event keys
-      console.log('Yjs blocks changed', event.keysChanged);
-      
+      // Simplistic full sync for now (MVP optimization needed later)
       const newBlocks: Record<string, NeoBlock> = this.yBlocks.toJSON();
       useEditorStore.setState({ blocks: newBlocks });
     });
 
     this.yRoot.observe((event) => {
-        console.log('Yjs root changed');
         const newRoot = this.yRoot.toJSON();
         useEditorStore.setState({ rootBlocks: newRoot });
     });
-
-    // 2. Listen to Zustand changes and update Yjs
-    // This is tricky with simple subscriptions as it can cause loops.
-    // Better pattern: Action-based updates or specific method hooks.
-    // For this plan, we will expose methods to be called by the store actions or middleware.
+    
+    // Subscribe to store changes to push to Yjs?
+    // Doing it inside store via middleware is better to avoid loops.
+    // OR expose a method here that the store calls.
   }
-
-  // Called when local user adds/updates a block
-  onLocalBlockUpdate(block: NeoBlock) {
-     if (JSON.stringify(this.yBlocks.get(block.id)) !== JSON.stringify(block)) {
-         this.yBlocks.set(block.id, block);
-     }
+  
+  // These methods should be called by the store actions
+  public syncBlock(block: NeoBlock) {
+      // Only update if changed prevents some loops, but Yjs handles identical updates well.
+      // We should check if the update is coming from Yjs (remote) or local.
+      // Since we are calling this from store actions, it's local.
+      // However, store actions might be triggered by Yjs updates -> loop risk!
+      // We need a flag or compare content.
+      
+      const currentYBlock = this.yBlocks.get(block.id);
+      if (JSON.stringify(currentYBlock) !== JSON.stringify(block)) {
+          // Improve: granular updates
+          this.yBlocks.set(block.id, block);
+      }
   }
-
-  onLocalBlockDelete(id: string) {
+  
+  public syncRoot(rootBlocks: string[]) {
+      const currentYRoot = this.yRoot.toJSON();
+      if (JSON.stringify(currentYRoot) !== JSON.stringify(rootBlocks)) {
+          this.doc.transact(() => {
+              this.yRoot.delete(0, this.yRoot.length);
+              this.yRoot.push(rootBlocks);
+          });
+      }
+  }
+  
+  public deleteBlock(id: string) {
       if (this.yBlocks.has(id)) {
           this.yBlocks.delete(id);
       }
+  }
+
+  destroy() {
+      this.provider.destroy();
+      this.wsProvider?.destroy();
+      this.doc.destroy();
+  }
+
+  get awareness() {
+      return this.wsProvider?.awareness;
   }
 }

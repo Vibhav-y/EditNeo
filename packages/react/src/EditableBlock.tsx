@@ -52,7 +52,27 @@ export const EditableBlock: React.FC<EditableBlockProps> = ({ block, autoFocus }
         fontWeight: block.type.startsWith('heading') ? 'bold' : 'normal',
       }}
     >
-      {block.content.map(s => s.text).join('')}
+      {block.content.map((span, i) => {
+        let style: React.CSSProperties = {};
+        if (span.bold) style.fontWeight = 'bold';
+        if (span.italic) style.fontStyle = 'italic';
+        if (span.underline) style.textDecoration = 'underline';
+        if (span.strike) style.textDecoration = (style.textDecoration ? style.textDecoration + ' ' : '') + 'line-through';
+        if (span.color) style.color = span.color;
+        if (span.highlight) style.backgroundColor = span.highlight;
+
+        const content = <span key={i} style={style}>{span.text}</span>;
+
+        if (span.code) {
+          return <code key={i} style={{ fontFamily: 'monospace', backgroundColor: '#eee', padding: '2px 4px', borderRadius: '3px' }}>{content}</code>;
+        }
+
+        if (span.link) {
+          return <a key={i} href={span.link} style={{ color: 'blue', textDecoration: 'underline' }}>{content}</a>;
+        }
+        
+        return content;
+      })}
     </div>
   );
 };

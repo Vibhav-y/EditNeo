@@ -1,0 +1,22 @@
+:root {
+  /* Typography */
+  --neo-font-family: "Inter", sans-serif;
+  --neo-code-font: "Fira Code", monospace;
+
+  /* Colors */
+  --neo-bg-canvas: #ffffff;
+  --neo-text-primary: #111827;
+  --neo-selection-color: #b4d5fe;
+  --neo-accent-color: #3b82f6;
+
+  /* Layout */
+  --neo-block-spacing: 1rem;
+  --neo-content-width: 800px;
+}
+
+/* Dark Mode Support is handled via JS toggling classes or media queries in userland, 
+   but specific overrides can be here if we use a data-theme attribute */
+[data-theme="dark"] {
+  --neo-bg-canvas: #0f172a;
+  --neo-text-primary: #f3f4f6;
+}

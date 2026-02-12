@@ -2,8 +2,8 @@
   "name": "@editneo/core",
   "version": "0.1.0",
   "private": true,
-  "main": "./src/store.ts",
-  "types": "./src/store.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "dependencies": {
     "zustand": "^4.5.1",
     "uuid": "^9.0.1",

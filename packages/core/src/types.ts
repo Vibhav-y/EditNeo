@@ -32,6 +32,8 @@ export interface NeoBlock {
 export interface EditorState {
   blocks: Record<string, NeoBlock>;
   rootBlocks: string[];
+  history: Partial<EditorState>[];
+  historyIndex: number;
   selection: {
     blockId: string | null;
     startOffset: number;

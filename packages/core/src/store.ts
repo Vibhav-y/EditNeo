@@ -6,6 +6,9 @@ interface EditorActions {
   addBlock: (type: BlockType, afterId?: string | null) => void;
   updateBlock: (id: string, partial: Partial<NeoBlock>) => void;
   deleteBlock: (id: string) => void;
+  toggleMark: (mark: keyof Pick<Span, 'bold' | 'italic' | 'underline' | 'strike' | 'code'>) => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 type EditorStore = EditorState & EditorActions;
@@ -18,9 +21,43 @@ export const useEditorStore = create<EditorStore>((set) => ({
     startOffset: 0,
     endOffset: 0,
   },
+  history: [],
+  historyIndex: -1,
 
+  undo: () => set((state) => {
+    if (state.historyIndex < 0) return state;
+    const prev = state.history[state.historyIndex];
+    return {
+      ...prev,
+      historyIndex: state.historyIndex - 1,
+      history: state.history, // Preserve history
+    };
+  }),
+
+  redo: () => set((state) => {
+    if (state.historyIndex >= state.history.length - 1) return state;
+    const next = state.history[state.historyIndex + 1];
+    return {
+      ...next,
+      historyIndex: state.historyIndex + 1,
+      history: state.history, // Preserve history
+    };
+  }),
+
+  // Helper to push state to history
+  // Note: specific actions should call this before mutating
+  // For simplicity in this MVP, we might wrap setters or just manually push in actions
+  
   addBlock: (type, afterId = null) =>
     set((state) => {
+      // Push current state to history before change
+      const historyEntry = { 
+        blocks: state.blocks, 
+        rootBlocks: state.rootBlocks, 
+        selection: state.selection 
+      };
+      const newHistory = [...state.history.slice(0, state.historyIndex + 1), historyEntry];
+
       const newId = uuid();
       const newBlock: NeoBlock = {
         id: newId,
@@ -44,6 +81,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
       return {
         blocks: { ...state.blocks, [newId]: newBlock },
         rootBlocks: newRootBlocks,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        selection: { blockId: newId, startOffset: 0, endOffset: 0 }
       };
     }),
 
@@ -52,11 +92,21 @@ export const useEditorStore = create<EditorStore>((set) => ({
       const block = state.blocks[id];
       if (!block) return state;
 
+      // naive history push for every update (might need debouncing for text)
+      const historyEntry = { 
+        blocks: state.blocks, 
+        rootBlocks: state.rootBlocks, 
+        selection: state.selection 
+      };
+      const newHistory = [...state.history.slice(0, state.historyIndex + 1), historyEntry];
+
       return {
         blocks: {
           ...state.blocks,
           [id]: { ...block, ...partial, updatedAt: Date.now() },
         },
+        history: newHistory,
+        historyIndex: newHistory.length - 1
       };
     }),
 
@@ -64,20 +114,18 @@ export const useEditorStore = create<EditorStore>((set) => ({
     set((state) => {
       const block = state.blocks[id];
       if (!block) return state;
+      
+      const historyEntry = { 
+        blocks: state.blocks, 
+        rootBlocks: state.rootBlocks, 
+        selection: state.selection 
+      };
+      const newHistory = [...state.history.slice(0, state.historyIndex + 1), historyEntry];
 
       const { [id]: deleted, ...remainingBlocks } = state.blocks;
       const newRootBlocks = state.rootBlocks.filter((blockId) => blockId !== id);
 
-      // Flatten children: move them to parent of deleted block or root if no parent
-      // Note: This implementation assumes simple root-level flattening for now as per plan "Flatten by default"
-      // More complex logic needed for nested structures if parentId is supported fully.
-      // For now, if a root block is deleted, its children (if any) are just orphaned or we need to handle them.
-      // The prompt said: "If the block has children, move them to the parent of the deleted block (flattening)"
-      
-      // Let's implement basic flattening for root blocks:
       if (block.children.length > 0) {
-          // If we had a parent, we'd add them there. Since we only really support rootBlocks logic here so far:
-          // We need to insert children into rootBlocks at the position of the deleted block.
            const index = state.rootBlocks.indexOf(id);
            if (index !== -1) {
                newRootBlocks.splice(index, 0, ...block.children);
@@ -87,6 +135,41 @@ export const useEditorStore = create<EditorStore>((set) => ({
       return {
         blocks: remainingBlocks,
         rootBlocks: newRootBlocks,
+        history: newHistory,
+        historyIndex: newHistory.length - 1
+      };
+    }),
+
+  toggleMark: (mark) =>
+    set((state) => {
+      const blockId = state.selection.blockId;
+      if (!blockId) return state;
+
+      const block = state.blocks[blockId];
+      if (!block) return state;
+
+      // Determine if the mark is currently active on all spans in the selection range
+      const allMarked = block.content.length > 0 && block.content.every((span) => span[mark]);
+
+      const newContent: Span[] = block.content.map((span) => ({
+        ...span,
+        [mark]: !allMarked,
+      }));
+
+      const historyEntry = {
+        blocks: state.blocks,
+        rootBlocks: state.rootBlocks,
+        selection: state.selection,
+      };
+      const newHistory = [...state.history.slice(0, state.historyIndex + 1), historyEntry];
+
+      return {
+        blocks: {
+          ...state.blocks,
+          [blockId]: { ...block, content: newContent, updatedAt: Date.now() },
+        },
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
       };
     }),
 }));
