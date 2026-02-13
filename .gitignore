@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # Dependencies
 node_modules
 .pnp
@@ -21,7 +19,7 @@ coverage
 # Vercel
 .vercel
 
-# Build Outputs
+# Build Outputs do not ever comit
 .next/
 out/
 build
