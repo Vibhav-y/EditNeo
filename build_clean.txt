@@ -1,0 +1,43 @@
+﻿node.exe : ΓÇó turbo 2.8.7
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Users\vibhav\AppData\Roaming 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~
+    + CategoryInfo          : NotS 
+   pecified: (ΓÇó turbo 2.8.7:Str  
+  ing) [], RemoteException
+    + FullyQualifiedErrorId : Nati 
+   veCommandError
+ 
+ΓÇó Packages in scope: @editneo/core, @editneo/pdf, @editneo/react, @editneo/sync, @editneo/ui-kit
+ΓÇó Running build in 5 packages
+ΓÇó Remote caching disabled
+@editneo/core:build: cache bypass, force executing b89446057d5f6fa6
+@editneo/core:build: 
+@editneo/core:build: > @editneo/core@0.1.0 build
+@editneo/core:build: > tsc
+@editneo/core:build: 
+@editneo/pdf:build: cache bypass, force executing 9cd1c10531fb96ed
+@editneo/sync:build: cache bypass, force executing f833c6659f488e7d
+@editneo/sync:build: 
+@editneo/sync:build: > @editneo/sync@0.1.0 build
+@editneo/sync:build: > tsc
+@editneo/sync:build: 
+@editneo/pdf:build: 
+@editneo/pdf:build: > @editneo/pdf@0.1.0 build
+@editneo/pdf:build: > tsc
+@editneo/pdf:build: 
+@editneo/react:build: cache bypass, force executing aa4eb7b6c6a473a6
+@editneo/react:build: 
+@editneo/react:build: > @editneo/react@0.1.0 build
+@editneo/react:build: > tsc
+@editneo/react:build: 
+
+ Tasks:    4 successful, 4 total
+Cached:    0 cached, 4 total
+  Time:    12.511s 
+
