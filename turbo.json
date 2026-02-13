@@ -8,7 +8,7 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": ["^build", "^check-types"]
     },
     "lint": {
       "dependsOn": ["^lint"]
