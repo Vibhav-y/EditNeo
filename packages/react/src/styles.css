@@ -1,22 +1,141 @@
+/* ─────────────────────────────────────────────────────────────────────
+   @editneo/react — Default Styles & Design Tokens
+   ───────────────────────────────────────────────────────────────────── */
+
 :root {
   /* Typography */
-  --neo-font-family: "Inter", sans-serif;
-  --neo-code-font: "Fira Code", monospace;
+  --neo-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --neo-font-size-body: 16px;
+  --neo-code-font: "Fira Code", "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
 
   /* Colors */
   --neo-bg-canvas: #ffffff;
   --neo-text-primary: #111827;
+  --neo-text-secondary: #6b7280;
   --neo-selection-color: #b4d5fe;
   --neo-accent-color: #3b82f6;
+  --neo-border-color: #e5e7eb;
 
   /* Layout */
-  --neo-block-spacing: 1rem;
+  --neo-block-spacing: 4px;
   --neo-content-width: 800px;
+  --neo-border-radius: 4px;
 }
 
-/* Dark Mode Support is handled via JS toggling classes or media queries in userland, 
-   but specific overrides can be here if we use a data-theme attribute */
+/* Dark Mode via data attribute */
 [data-theme="dark"] {
   --neo-bg-canvas: #0f172a;
   --neo-text-primary: #f3f4f6;
+  --neo-text-secondary: #9ca3af;
+  --neo-selection-color: #334155;
+  --neo-accent-color: #60a5fa;
+  --neo-border-color: #374151;
+}
+
+/* ── Editor root ─────────────────────────────────────────────────── */
+
+.neo-editor {
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.neo-editor *::selection {
+  background: var(--neo-selection-color);
+}
+
+/* ── Block spacing ───────────────────────────────────────────────── */
+
+.neo-editor [contenteditable] {
+  outline: none;
+}
+
+.neo-editor [contenteditable]:empty::before {
+  content: "Type '/' for commands";
+  color: var(--neo-text-secondary);
+  pointer-events: none;
+}
+
+/* ── Heading styles ──────────────────────────────────────────────── */
+
+.neo-heading-1 {
+  margin: 1em 0 0.25em;
+}
+
+.neo-heading-2 {
+  margin: 0.75em 0 0.2em;
+}
+
+.neo-heading-3 {
+  margin: 0.5em 0 0.15em;
+}
+
+/* ── Code block ──────────────────────────────────────────────────── */
+
+.neo-code-block {
+  font-family: var(--neo-code-font);
+  font-size: 0.9em;
+  tab-size: 2;
+}
+
+/* ── Quote ────────────────────────────────────────────────────────── */
+
+.neo-quote {
+  border-left: 3px solid var(--neo-accent-color);
+  padding-left: 1em;
+  color: var(--neo-text-secondary);
+  font-style: italic;
+}
+
+/* ── Callout ──────────────────────────────────────────────────────── */
+
+.neo-callout {
+  border-radius: var(--neo-border-radius);
+}
+
+/* ── Divider ──────────────────────────────────────────────────────── */
+
+.neo-divider hr {
+  border: none;
+  border-top: 1px solid var(--neo-border-color);
+  margin: 1em 0;
+}
+
+/* ── Aeropeak animations ─────────────────────────────────────────── */
+
+.neo-anim-fade {
+  animation: neoFadeIn 0.15s ease-out;
+}
+
+.neo-anim-scale {
+  animation: neoScaleIn 0.15s ease-out;
+}
+
+@keyframes neoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes neoScaleIn {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
+/* ── Slash menu ──────────────────────────────────────────────────── */
+
+.neo-slash-menu {
+  animation: neoFadeIn 0.1s ease-out;
+}
+
+/* ── Toolbar button hover ────────────────────────────────────────── */
+
+.neo-aero-button:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ── List items ──────────────────────────────────────────────────── */
+
+.neo-list-item input[type="checkbox"] {
+  accent-color: var(--neo-accent-color);
+  margin-top: 2px;
 }

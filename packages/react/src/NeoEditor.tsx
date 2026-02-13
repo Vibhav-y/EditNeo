@@ -1,11 +1,11 @@
-import React, { createContext, useEffect, useMemo, useState } from 'react';
-import { useEditorStore } from '@editneo/core';
-import { SyncManager } from '@editneo/sync';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createEditorStore, EditorStoreInstance, EditorStore } from '@editneo/core';
+import { useStore } from 'zustand';
 import { NeoCanvas } from './NeoCanvas';
 import './styles.css';
 
 export interface NeoEditorProps {
-  id: string; // Document ID
+  id: string;
   offline?: boolean;
   syncConfig?: {
     url: string;
@@ -15,17 +15,31 @@ export interface NeoEditorProps {
   className?: string;
   theme?: {
     mode: 'light' | 'dark';
-    // Allow overriding variables directly if needed
     [key: string]: any;
   };
   children?: React.ReactNode;
 }
 
-export const EditorContext = createContext<{
+interface EditorContextValue {
   editorId: string;
-  syncManager: SyncManager | null;
+  store: EditorStoreInstance;
+  syncManager: any | null;
   renderBlock?: (block: any, defaultRender: any) => React.ReactNode;
-} | null>(null);
+}
+
+export const EditorContext = createContext<EditorContextValue | null>(null);
+
+/**
+ * Hook to access the current editor's Zustand store via context.
+ * Supports selectors for fine-grained re-render control.
+ */
+export function useEditorStoreContext<T>(selector: (state: EditorStore) => T): T {
+  const ctx = useContext(EditorContext);
+  if (!ctx) {
+    throw new Error('useEditorStoreContext must be used within a <NeoEditor />');
+  }
+  return useStore(ctx.store, selector);
+}
 
 export const NeoEditor: React.FC<NeoEditorProps> = ({
   id,
@@ -36,51 +50,77 @@ export const NeoEditor: React.FC<NeoEditorProps> = ({
   theme,
   children
 }) => {
-  const [syncManager, setSyncManager] = useState<SyncManager | null>(null);
+  // Create a store instance that lives for the lifetime of this editor.
+  const storeRef = useRef<EditorStoreInstance>();
+  if (!storeRef.current) {
+    storeRef.current = createEditorStore();
+  }
 
-  // Initialize Sync Manager
+  const editorRootRef = useRef<HTMLDivElement>(null);
+  const [syncManager, setSyncManager] = useState<any | null>(null);
+
+  // (#13) Only create SyncManager when sync or offline persistence is needed
   useEffect(() => {
-    const manager = new SyncManager(id);
-    // TODO: Configure websocket if syncConfig is present (will be added to SyncManager later)
-    setSyncManager(manager);
-    
+    // Lazy-import sync to avoid forcing all consumers to install @editneo/sync
+    const needsSync = syncConfig || offline;
+    if (!needsSync) return;
+
+    let manager: any = null;
+
+    import('@editneo/sync').then(({ SyncManager }) => {
+      manager = new SyncManager(id, syncConfig);
+      manager.bindStore(storeRef.current!);
+      setSyncManager(manager);
+    }).catch(() => {
+      // @editneo/sync not installed — silently skip
+      console.warn('@editneo/sync is not installed. Sync and offline persistence are disabled.');
+    });
+
     return () => {
-      // manager.destroy(); // Implement destroy in SyncManager
+      if (manager) manager.destroy();
     };
-  }, [id, syncConfig]);
+  }, [id, syncConfig, offline]);
 
-  // Apply Theme
+  // (#22) Scope theme to this editor's root element, not document.documentElement
   useEffect(() => {
-    const root = document.documentElement;
+    const el = editorRootRef.current;
+    if (!el) return;
+
     if (theme?.mode === 'dark') {
-      root.style.setProperty('--neo-bg-canvas', '#0f172a');
-      root.style.setProperty('--neo-text-primary', '#f3f4f6');
+      el.style.setProperty('--neo-bg-canvas', '#0f172a');
+      el.style.setProperty('--neo-text-primary', '#f3f4f6');
+      el.style.setProperty('--neo-selection-color', '#334155');
     } else {
-      root.style.setProperty('--neo-bg-canvas', '#ffffff');
-      root.style.setProperty('--neo-text-primary', '#111827');
+      el.style.setProperty('--neo-bg-canvas', '#ffffff');
+      el.style.setProperty('--neo-text-primary', '#111827');
+      el.style.setProperty('--neo-selection-color', '#b4d5fe');
     }
   }, [theme]);
 
-  const value = useMemo(() => ({
+  const value = useMemo((): EditorContextValue => ({
     editorId: id,
+    store: storeRef.current!,
     syncManager,
     renderBlock
   }), [id, syncManager, renderBlock]);
 
   return (
     <EditorContext.Provider value={value}>
-      <div className={`neo-editor ${className || ''}`} style={{ 
-        backgroundColor: 'var(--neo-bg-canvas)', 
-        color: 'var(--neo-text-primary)',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative'
-      }}>
-        {/* Toolbar/Menu Area (if children provided) */}
+      <div
+        ref={editorRootRef}
+        className={`neo-editor ${className || ''}`}
+        style={{ 
+          backgroundColor: 'var(--neo-bg-canvas)', 
+          color: 'var(--neo-text-primary)',
+          fontFamily: 'var(--neo-font-family)',
+          fontSize: 'var(--neo-font-size-body)',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative'
+        }}
+      >
         {children}
-        
-        {/* Main Canvas */}
         <div style={{ flex: 1, position: 'relative' }}>
              <NeoCanvas />
         </div>

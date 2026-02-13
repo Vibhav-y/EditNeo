@@ -1,29 +1,44 @@
 import { useContext } from 'react';
-import { useEditorStore } from '@editneo/core';
+import { useStore } from 'zustand';
+import { EditorStore } from '@editneo/core';
 import { EditorContext } from './NeoEditor';
 
+/**
+ * Primary hook for interacting with the current editor instance.
+ * Must be called inside a <NeoEditor />.
+ * Returns all store state and actions for the enclosing editor only.
+ */
 export const useEditor = () => {
-  const store = useEditorStore();
   const context = useContext(EditorContext);
   
   if (!context) {
     throw new Error('useEditor must be used within a NeoEditor');
   }
 
+  const store = useStore(context.store);
+
   return {
     ...store,
-    // Add specific editor methods here that might combine store + sync
     insertBlock: store.addBlock, // Alias for DX
-    // exportJSON implementation would go here
   };
 };
 
+/**
+ * Focused hook that subscribes only to the selection state,
+ * minimizing re-renders in components that don't need the full document.
+ */
 export const useSelection = () => {
-  return useEditorStore((state) => state.selection);
+  const context = useContext(EditorContext);
+  if (!context) {
+    throw new Error('useSelection must be used within a NeoEditor');
+  }
+  return useStore(context.store, (state: EditorStore) => state.selection);
 };
 
+/**
+ * Returns the current sync connection status.
+ */
 export const useSyncStatus = () => {
   const context = useContext(EditorContext);
-  // Placeholder - needs SyncManager to expose status observable
   return context?.syncManager ? 'connected' : 'disconnected';
 };

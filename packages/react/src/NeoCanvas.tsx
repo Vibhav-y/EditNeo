@@ -1,17 +1,42 @@
-import React, { useRef } from 'react';
+import React, { useRef, useContext } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEditorStore } from '@editneo/core';
-import { EditableBlock } from './EditableBlock';
+import { useStore } from 'zustand';
+import { EditorContext } from './NeoEditor';
+import { BlockRenderer } from './BlockRenderer';
 
 export const NeoCanvas: React.FC = () => {
-  const rootBlocks = useEditorStore((state) => state.rootBlocks);
-  const blocks = useEditorStore((state) => state.blocks);
+  const context = useContext(EditorContext);
+
+  if (!context) {
+    throw new Error('NeoCanvas must be used within a NeoEditor');
+  }
+
+  const rootBlocks = useStore(context.store, (state) => state.rootBlocks);
+  const blocks = useStore(context.store, (state) => state.blocks);
   const parentRef = useRef<HTMLDivElement>(null);
+
+  /** (#26) Type-aware size estimates for better virtualizer performance */
+  const estimateSize = (index: number): number => {
+    const blockId = rootBlocks[index];
+    const block = blocks[blockId];
+    if (!block) return 35;
+
+    switch (block.type) {
+      case 'heading-1': return 60;
+      case 'heading-2': return 48;
+      case 'heading-3': return 40;
+      case 'code-block': return 120;
+      case 'image':
+      case 'video': return 200;
+      case 'divider': return 24;
+      default: return 35;
+    }
+  };
 
   const rowVirtualizer = useVirtualizer({
     count: rootBlocks.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 35, // Estimate row height
+    estimateSize,
     overscan: 5,
   });
 
@@ -19,7 +44,7 @@ export const NeoCanvas: React.FC = () => {
     <div
       ref={parentRef}
       style={{
-        height: '100vh',
+        height: '100%', /* (#24) was 100vh, causing double scrollbar */
         width: '100%',
         overflow: 'auto',
       }}
@@ -29,6 +54,9 @@ export const NeoCanvas: React.FC = () => {
           height: `${rowVirtualizer.getTotalSize()}px`,
           width: '100%',
           position: 'relative',
+          maxWidth: 'var(--neo-content-width, 800px)',
+          margin: '0 auto',
+          padding: '0 1rem',
         }}
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -50,7 +78,8 @@ export const NeoCanvas: React.FC = () => {
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
-              <EditableBlock block={block} />
+              {/* (#10) Route through BlockRenderer instead of EditableBlock directly */}
+              <BlockRenderer block={block} />
             </div>
           );
         })}

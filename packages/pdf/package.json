@@ -1,9 +1,17 @@
 {
   "name": "@editneo/pdf",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "PDF transmutation engine for EditNeo — converts PDFs into editable blocks",
+  "type": "module",
   "main": "./dist/worker.js",
   "types": "./dist/worker.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc",

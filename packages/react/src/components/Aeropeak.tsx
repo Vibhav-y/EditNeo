@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useEditor } from '../hooks';
+import React, { useEffect, useState, useContext } from 'react';
+import { useStore } from 'zustand';
+import { EditorContext } from '../NeoEditor';
 
 interface AeropeakProps {
   children?: React.ReactNode;
@@ -10,13 +11,17 @@ interface AeropeakProps {
 export const Aeropeak: React.FC<AeropeakProps> & {
   Bold: React.FC;
   Italic: React.FC;
+  Underline: React.FC;
   Strike: React.FC;
+  Code: React.FC;
   Link: React.FC;
 } = ({ children, offset = 10, animation = 'fade' }) => {
-  const { selection, toggleMark } = useEditor(); // toggleMark to be implemented in useEditor/store
   const [position, setPosition] = useState<{ x: number, y: number } | null>(null);
 
   useEffect(() => {
+    // (#44) SSR guard
+    if (typeof window === 'undefined') return;
+
     const handleSelectionChange = () => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -27,9 +32,6 @@ export const Aeropeak: React.FC<AeropeakProps> & {
       const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       
-      // Calculate position relative to viewport (fixed positioning usually easiest for portals)
-      // or relative to editor container if using absolute.
-      // For now, let's use fixed/absolute coordinates based on rect.
       if (rect.width > 0) {
         setPosition({
           x: rect.left + rect.width / 2,
@@ -50,18 +52,18 @@ export const Aeropeak: React.FC<AeropeakProps> & {
     <div
       className={`neo-aeropeak neo-anim-${animation}`}
       style={{
-        position: 'fixed', // Using fixed for simplicity with viewport coords
+        position: 'fixed',
         top: position.y,
         left: position.x,
         transform: 'translate(-50%, -100%)',
         zIndex: 1000,
-        backgroundColor: '#333',
-        color: 'white',
-        borderRadius: '4px',
+        backgroundColor: '#1f2937',
+        color: '#ffffff',
+        borderRadius: '6px',
         padding: '4px',
         display: 'flex',
-        gap: '4px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+        gap: '2px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
       }}
       onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
     >
@@ -69,7 +71,9 @@ export const Aeropeak: React.FC<AeropeakProps> & {
         <>
           <Aeropeak.Bold />
           <Aeropeak.Italic />
+          <Aeropeak.Underline />
           <Aeropeak.Strike />
+          <Aeropeak.Code />
           <Aeropeak.Link />
         </>
       )}
@@ -80,12 +84,11 @@ export const Aeropeak: React.FC<AeropeakProps> & {
 export const AeroButton: React.FC<{
   icon: React.ReactNode;
   label?: string;
-  onClick: (editor: any) => void;
+  onClick: () => void;
 }> = ({ icon, label, onClick }) => {
-  const editor = useEditor();
   return (
     <button 
-      onClick={() => onClick(editor)}
+      onClick={onClick}
       className="neo-aero-button"
       title={label}
       style={{
@@ -94,9 +97,13 @@ export const AeroButton: React.FC<{
         color: 'inherit',
         cursor: 'pointer',
         padding: '4px 8px',
-        borderRadius: '2px',
-        display: 'flex', alignItems: 'center'
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '14px',
       }}
+      onMouseEnter={(e) => { (e.target as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)'; }}
+      onMouseLeave={(e) => { (e.target as HTMLElement).style.backgroundColor = 'transparent'; }}
     >
       {icon}
     </button>
@@ -104,11 +111,35 @@ export const AeroButton: React.FC<{
 };
 
 export const Separator: React.FC = () => (
-    <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+    <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 2px' }} />
 );
 
-// Default Buttons
-Aeropeak.Bold = () => <AeroButton icon={<strong>B</strong>} label="Bold" onClick={(e) => e.toggleMark && e.toggleMark('bold')} />;
-Aeropeak.Italic = () => <AeroButton icon={<em>I</em>} label="Italic" onClick={(e) => e.toggleMark && e.toggleMark('italic')} />;
-Aeropeak.Strike = () => <AeroButton icon={<s>S</s>} label="Strike" onClick={(e) => e.toggleMark && e.toggleMark('strike')} />;
-Aeropeak.Link = () => <AeroButton icon={<span>🔗</span>} label="Link" onClick={(e) => e.toggleMark && e.toggleMark('link')} />;
+/** Helper component that connects to context store */
+function MarkButton({ mark, icon, label }: { mark: 'bold' | 'italic' | 'underline' | 'strike' | 'code'; icon: React.ReactNode; label: string }) {
+  const context = useContext(EditorContext);
+  const toggleMark = context ? useStore(context.store, (s) => s.toggleMark) : null;
+  return <AeroButton icon={icon} label={label} onClick={() => toggleMark?.(mark)} />;
+}
+
+// (#28) Added Underline and Code buttons
+Aeropeak.Bold = () => <MarkButton mark="bold" icon={<strong>B</strong>} label="Bold" />;
+Aeropeak.Italic = () => <MarkButton mark="italic" icon={<em>I</em>} label="Italic" />;
+Aeropeak.Underline = () => <MarkButton mark="underline" icon={<u>U</u>} label="Underline" />;
+Aeropeak.Strike = () => <MarkButton mark="strike" icon={<s>S</s>} label="Strikethrough" />;
+Aeropeak.Code = () => <MarkButton mark="code" icon={<span style={{ fontFamily: 'monospace' }}>&lt;/&gt;</span>} label="Code" />;
+
+// (#19) Link button prompts for URL and calls setLink
+Aeropeak.Link = () => {
+  const context = useContext(EditorContext);
+  const setLink = context ? useStore(context.store, (s) => s.setLink) : null;
+
+  const handleClick = () => {
+    if (!setLink) return;
+    const url = prompt('Enter URL:');
+    if (url !== null) {
+      setLink(url || null);
+    }
+  };
+
+  return <AeroButton icon={<span style={{ fontSize: '12px' }}>Link</span>} label="Link" onClick={handleClick} />;
+};

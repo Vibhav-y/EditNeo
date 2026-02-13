@@ -1,9 +1,17 @@
 {
   "name": "@editneo/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Core engine for EditNeo — block-based editor with CRDT sync",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
@@ -14,8 +22,7 @@
   },
   "dependencies": {
     "zustand": "^4.5.1",
-    "uuid": "^9.0.1",
-    "immer": "^10.0.3"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

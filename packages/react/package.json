@@ -1,9 +1,17 @@
 {
   "name": "@editneo/react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React components for EditNeo — NeoEditor, Aeropeak, SlashMenu, and more",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
@@ -14,19 +22,29 @@
   },
   "dependencies": {
     "@editneo/core": "*",
-    "@editneo/pdf": "*",
-    "@editneo/sync": "*",
     "@tanstack/react-virtual": "^3.0.0",
     "zustand": "^4.5.1"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "@editneo/sync": "^0.1.0",
+    "@editneo/pdf": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@editneo/sync": {
+      "optional": true
+    },
+    "@editneo/pdf": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.3.3",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0"
+    "@types/react-dom": "^18.2.0",
+    "@editneo/sync": "*",
+    "@editneo/pdf": "*"
   },
   "license": "MIT"
 }

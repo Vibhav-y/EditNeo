@@ -39,7 +39,7 @@ function App() {
 }
 ```
 
-That's it. You have a working block editor with undo/redo, rich text, and slash commands.
+That's it. You have a working block editor with undo/redo, rich text, and slash commands. Each `NeoEditor` instance is fully isolated — place multiple editors on the same page without conflicts.
 
 ---
 
@@ -58,8 +58,8 @@ EditNeo is a monorepo with focused, independent packages. Install only what you 
 
 ```
 @editneo/react ──→ @editneo/core
-                ──→ @editneo/sync (optional)
-                ──→ @editneo/pdf  (optional)
+                ──→ @editneo/sync (optional peer dep)
+                ──→ @editneo/pdf  (optional peer dep)
 @editneo/sync  ──→ @editneo/core
 @editneo/pdf   ──→ @editneo/core
 ```
@@ -100,7 +100,7 @@ EditNeo is a monorepo with focused, independent packages. Install only what you 
 
 ### `@editneo/core`
 
-The headless engine. Framework-agnostic types and state management.
+The headless engine. Framework-agnostic types and state management with **per-instance store isolation**.
 
 #### Block Types
 
@@ -116,7 +116,6 @@ type BlockType =
   | "code-block"
   | "image"
   | "video"
-  | "pdf-page"
   | "quote"
   | "divider"
   | "callout";
@@ -157,35 +156,55 @@ interface NeoBlock {
 
 #### Editor Store (Zustand)
 
-```typescript
-import { useEditorStore } from "@editneo/core";
+Each editor instance creates its own store via `createEditorStore()`:
 
-// Read state
-const blocks = useEditorStore((s) => s.blocks);
-const rootBlocks = useEditorStore((s) => s.rootBlocks);
+```typescript
+import { createEditorStore } from "@editneo/core";
+
+const store = createEditorStore();
+const state = store.getState();
 
 // Actions
-const { addBlock, updateBlock, deleteBlock, toggleMark, undo, redo } =
-  useEditorStore.getState();
+const {
+  addBlock,
+  insertFullBlock,
+  insertFullBlocks,
+  updateBlock,
+  deleteBlock,
+  moveBlock,
+  setBlockType,
+  toggleMark,
+  setLink,
+  undo,
+  redo,
+  exportJSON,
+  importJSON,
+} = state;
 
 addBlock("heading-1"); // Add at end
 addBlock("paragraph", "block-3"); // Add after specific block
 updateBlock("block-1", { content: [{ text: "Hello" }] });
 deleteBlock("block-2");
-toggleMark("bold"); // Toggle on selected block
+moveBlock("block-1", "block-3"); // Move after block-3
+setBlockType("block-1", "heading-2"); // Change type
+toggleMark("bold"); // Toggle on selection range
+setLink("https://editneo.dev"); // Set link on selection
 undo();
 redo();
+
+const data = exportJSON(); // Serialize
+importJSON(data); // Restore
 ```
 
 ---
 
 ### `@editneo/react`
 
-Drop-in React components with virtualized rendering.
+Drop-in React components with virtualized rendering and per-instance store isolation.
 
 #### `<NeoEditor />`
 
-The root editor component. Wraps everything in context.
+The root editor component. Creates an isolated store and wraps everything in context.
 
 ```tsx
 import { NeoEditor } from "@editneo/react";
@@ -200,7 +219,6 @@ import { NeoEditor } from "@editneo/react";
   }}
   theme={{ mode: "dark" }} // 'light' | 'dark'
   renderBlock={(block, defaultRender) => {
-    // Intercept rendering for custom block types
     if (block.type === "custom-widget") {
       return <MyWidget block={block} />;
     }
@@ -208,7 +226,9 @@ import { NeoEditor } from "@editneo/react";
   }}
   className="my-editor"
 >
-  {/* Optional: toolbar, menus, etc. */}
+  <Aeropeak />
+  <SlashMenu />
+  <CursorOverlay />
 </NeoEditor>;
 ```
 
@@ -218,7 +238,7 @@ import { NeoEditor } from "@editneo/react";
 import { useEditor, useSelection, useSyncStatus } from "@editneo/react";
 
 function MyToolbar() {
-  const { insertBlock, toggleMark, undo, redo } = useEditor();
+  const { insertBlock, toggleMark, setLink, undo, redo } = useEditor();
   const selection = useSelection();
   const status = useSyncStatus(); // 'connected' | 'disconnected'
 
@@ -226,6 +246,7 @@ function MyToolbar() {
     <div>
       <button onClick={() => toggleMark("bold")}>Bold</button>
       <button onClick={() => insertBlock("heading-1")}>H1</button>
+      <button onClick={() => setLink(prompt("URL:"))}>Link</button>
       <button onClick={undo}>↩ Undo</button>
       <button onClick={redo}>↪ Redo</button>
       <span>{status === "connected" ? "🟢" : "🔴"}</span>
@@ -236,36 +257,33 @@ function MyToolbar() {
 
 #### `<Aeropeak />` — Floating Toolbar
 
-Appears automatically when the user selects text. Fully composable.
+Appears automatically when the user selects text. Includes Bold, Italic, Underline, Strikethrough, Code, and Link buttons by default. Fully composable.
 
 ```tsx
-import { Aeropeak, AeroButton, Separator } from '@editneo/react';
+import { Aeropeak } from "@editneo/react";
 
-// Default (Bold, Italic, Strike, Link)
+// Default (Bold, Italic, Underline, Strike, Code, Link)
 <NeoEditor id="doc">
   <Aeropeak />
-</NeoEditor>
-
-// Custom toolbar
-<Aeropeak offset={12} animation="scale">
-  <AeroButton icon={<strong>B</strong>} label="Bold" onClick={(e) => e.toggleMark?.('bold')} />
-  <Separator />
-  <AeroButton icon={<em>I</em>} label="Italic" onClick={(e) => e.toggleMark?.('italic')} />
-</Aeropeak>
+</NeoEditor>;
 ```
 
 #### `<SlashMenu />` — Command Palette
 
-Triggered by typing `/` in an empty block. Supports filtering + custom commands.
+Triggered by typing `/`. Supports live query filtering and custom commands.
 
 ```tsx
 import { SlashMenu } from "@editneo/react";
 
 <NeoEditor id="doc">
   <SlashMenu
-    commands={[
-      { label: "Alert Box", icon: "🚨", type: "callout" },
-      { label: "Diagram", icon: "📊", action: () => insertDiagram() },
+    customCommands={[
+      {
+        key: "diagram",
+        label: "Diagram",
+        icon: "📊",
+        execute: (editor) => editor.addBlock("image"),
+      },
     ]}
   />
 </NeoEditor>;
@@ -275,18 +293,13 @@ import { SlashMenu } from "@editneo/react";
 
 #### `<PDFDropZone />`
 
-Drag-and-drop PDF import with intelligent block extraction.
+Drag-and-drop PDF import with client-side extraction. Lazily loads `@editneo/pdf`.
 
 ```tsx
 import { PDFDropZone } from "@editneo/react";
 
 <NeoEditor id="doc">
-  <PDFDropZone
-    onDrop={(files) => console.log("Dropped:", files)}
-    renderOverlay={({ isOver }) =>
-      isOver && <div className="drop-glow">✨ Release to Transmute</div>
-    }
-  >
+  <PDFDropZone>
     <NeoCanvas />
   </PDFDropZone>
 </NeoEditor>;
@@ -294,38 +307,35 @@ import { PDFDropZone } from "@editneo/react";
 
 #### `<CursorOverlay />`
 
-Shows remote collaborators' cursors in real time.
+Shows remote collaborators' cursors with pixel-accurate positioning and name labels.
 
 ```tsx
-import { CursorOverlay } from "@editneo/react";
-
 <NeoEditor id="doc" syncConfig={{ url: "wss://...", room: "doc-123" }}>
   <CursorOverlay />
-</NeoEditor>;
+</NeoEditor>
 ```
 
 ---
 
 ### `@editneo/sync`
 
-CRDT-based real-time collaboration and offline persistence.
+CRDT-based real-time collaboration and offline persistence. **Bidirectional sync** — store changes automatically propagate to Yjs and vice versa.
 
 ```typescript
 import { SyncManager } from "@editneo/sync";
+import { createEditorStore } from "@editneo/core";
 
+const store = createEditorStore();
 const sync = new SyncManager("doc-123", {
   url: "wss://your-yjs-server.com",
   room: "doc-123",
 });
 
-// Sync a local block change to Yjs
-sync.syncBlock(updatedBlock);
+sync.bindStore(store); // Automatic bidirectional sync
 
-// Sync root block order
-sync.syncRoot(["block-1", "block-2", "block-3"]);
-
-// Access awareness (for cursor positions)
-const awareness = sync.awareness;
+// Set user awareness
+sync.setUser({ name: "Alice", color: "#3b82f6" });
+sync.setCursor("block-abc", 12);
 
 // Cleanup
 sync.destroy();
@@ -333,48 +343,54 @@ sync.destroy();
 
 **Features:**
 
-- 🔄 **2-way sync** — Zustand ↔ Yjs, conflict-free
+- 🔄 **Bidirectional sync** — Zustand ↔ Yjs, fully automatic
 - 💾 **Offline-first** — IndexedDB persistence via `y-indexeddb`
 - 🌐 **Real-time** — WebSocket provider via `y-websocket`
-- 👥 **Awareness** — Track remote cursor positions
+- 👥 **Awareness** — `setUser()` + `setCursor()` APIs
+- 🛡️ **Loop prevention** — `isSyncing` flag guards both directions
+- ⚡ **Error handling** — connection error/close listeners with auto-reconnect
 
 ---
 
 ### `@editneo/pdf`
 
-Client-side PDF transmutation into editable blocks.
+Client-side PDF transmutation into editable blocks with error handling.
 
 ```typescript
 import { extractBlocksFromPdf } from "@editneo/pdf";
 
 const buffer = await file.arrayBuffer();
 const blocks = await extractBlocksFromPdf(buffer);
-// Returns: NeoBlock[] — paragraphs, headings, images extracted from PDF
+// Returns: NeoBlock[] — paragraphs, headings (h1-h3), images extracted from PDF
 ```
+
+**Features:**
+
+- 📝 Multi-signal heading detection (font size, bold, caps, line length)
+- 🖼️ Real image extraction (RGB/RGBA → PNG data URI)
+- 🔐 Password-protected PDF detection
+- 🛡️ Per-page error handling (one bad page doesn't crash extraction)
 
 ---
 
 ## 🎨 Theming
 
-EditNeo uses CSS variables for theming. Override them in your stylesheet:
+EditNeo uses CSS variables scoped to each editor instance. Override them in your stylesheet:
 
 ```css
 :root {
   --neo-font-family: "Inter", system-ui, sans-serif;
   --neo-font-size-body: 16px;
+  --neo-code-font: "Fira Code", "Consolas", monospace;
   --neo-accent-color: #3b82f6;
   --neo-bg-canvas: #ffffff;
   --neo-text-primary: #111827;
+  --neo-text-secondary: #6b7280;
+  --neo-selection-color: #b4d5fe;
+  --neo-border-color: #e5e7eb;
   --neo-border-radius: 4px;
   --neo-block-spacing: 4px;
-}
-
-/* Dark Mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --neo-bg-canvas: #0f172a;
-    --neo-text-primary: #f3f4f6;
-  }
+  --neo-content-width: 800px;
 }
 ```
 
@@ -390,7 +406,7 @@ Or pass theme programmatically:
 
 ### Prerequisites
 
-- **Node.js** ≥ 20
+- **Node.js** ≥ 18
 - **npm** ≥ 11
 
 ### Setup
@@ -424,16 +440,16 @@ EditNeo/
 │   ├── core/         # @editneo/core — types, store, engine
 │   │   └── src/
 │   │       ├── types.ts    # BlockType, Span, NeoBlock, EditorState
-│   │       ├── store.ts    # Zustand store with undo/redo
+│   │       ├── store.ts    # Zustand store factory with undo/redo
 │   │       └── index.ts
 │   ├── react/        # @editneo/react — UI components
 │   │   └── src/
 │   │       ├── NeoEditor.tsx
 │   │       ├── NeoCanvas.tsx       # Virtualized block rendering
-│   │       ├── EditableBlock.tsx   # Rich text input
+│   │       ├── EditableBlock.tsx   # Rich text input with DOM parsing
 │   │       ├── BlockRenderer.tsx   # Block type switch
 │   │       ├── hooks.ts
-│   │       ├── styles.css
+│   │       ├── styles.css          # CSS design tokens
 │   │       ├── blocks/             # HeadingBlock, ListBlock, etc.
 │   │       └── components/         # Aeropeak, SlashMenu, etc.
 │   ├── sync/         # @editneo/sync — Yjs CRDT manager

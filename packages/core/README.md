@@ -32,7 +32,6 @@ type BlockType =
   | "code-block"
   | "image"
   | "video"
-  | "pdf-page"
   | "quote"
   | "divider"
   | "callout";
@@ -99,28 +98,22 @@ interface EditorState {
 
 ## Editor Store
 
-The store is a [Zustand](https://zustand-demo.pmnd.rs/) store. You can use it directly in React via the hook, or access it imperatively from anywhere.
+The store uses [Zustand](https://zustand-demo.pmnd.rs/) and follows a **per-instance factory pattern**. Each editor creates its own isolated store via `createEditorStore()`, so multiple editors on the same page don't share state. The store is seeded with an initial empty paragraph block.
 
-### Using the hook (inside React components)
+### Creating a store instance
 
 ```typescript
-import { useEditorStore } from "@editneo/core";
+import { createEditorStore } from "@editneo/core";
 
-function MyComponent() {
-  // Subscribe to specific slices to avoid unnecessary re-renders
-  const blocks = useEditorStore((state) => state.blocks);
-  const rootBlocks = useEditorStore((state) => state.rootBlocks);
-  const selection = useEditorStore((state) => state.selection);
-}
+const store = createEditorStore();
+// Each call returns a new, independent store
 ```
 
-### Imperative access (outside React, in tests, etc.)
+### Accessing state
 
 ```typescript
-import { useEditorStore } from "@editneo/core";
-
-const state = useEditorStore.getState();
-const { addBlock, updateBlock, deleteBlock, toggleMark, undo, redo } = state;
+const state = store.getState();
+const { blocks, rootBlocks, selection } = state;
 ```
 
 ### Actions
@@ -134,9 +127,25 @@ addBlock("paragraph"); // Appends a paragraph at the end
 addBlock("heading-1", "block-abc"); // Inserts a heading after block-abc
 ```
 
+#### `insertFullBlock(block, afterId?)`
+
+Inserts a complete `NeoBlock` object (e.g. one created by PDF extraction or imported data). Unlike `addBlock`, this accepts a fully formed block rather than just a type.
+
+```typescript
+insertFullBlock(myBlock, "block-abc");
+```
+
+#### `insertFullBlocks(blocks, afterId?)`
+
+Batch-inserts multiple complete blocks at once.
+
+```typescript
+insertFullBlocks(pdfBlocks, "block-abc");
+```
+
 #### `updateBlock(id, partial)`
 
-Merges partial data into an existing block. The `updatedAt` timestamp is set automatically. History is recorded.
+Merges partial data into an existing block. The `updatedAt` timestamp is set automatically. History is debounced — rapid edits to the same block within 300ms are grouped into a single undo step.
 
 ```typescript
 updateBlock("block-abc", {
@@ -150,24 +159,61 @@ updateBlock("block-xyz", {
 
 #### `deleteBlock(id)`
 
-Removes a block from the document. If the block has children, those children are promoted to the root level in the same position. History is recorded.
+Removes a block from the document. If the block has children, those children are promoted to the root level in the same position with their `parentId` cleared. History is recorded.
 
 ```typescript
 deleteBlock("block-abc");
 ```
 
+#### `moveBlock(id, afterId)`
+
+Moves a block to a new position. If `afterId` is `null`, the block is moved to the beginning.
+
+```typescript
+moveBlock("block-abc", "block-xyz"); // Move abc after xyz
+moveBlock("block-abc", null); // Move abc to the start
+```
+
+#### `setBlockType(id, newType)`
+
+Changes a block's type without altering its content.
+
+```typescript
+setBlockType("block-abc", "heading-1");
+```
+
 #### `toggleMark(mark)`
 
-Toggles an inline formatting mark on the currently selected block's content. If all spans already have the mark, it is removed. Otherwise it is applied to all spans. Supported marks: `'bold'`, `'italic'`, `'underline'`, `'strike'`, `'code'`.
+Toggles an inline formatting mark on the currently selected range. The mark is applied precisely within the selection's `startOffset`/`endOffset`, splitting spans as needed. Supported marks: `'bold'`, `'italic'`, `'underline'`, `'strike'`, `'code'`.
 
 ```typescript
 toggleMark("bold");
 toggleMark("italic");
 ```
 
+#### `setLink(url)`
+
+Sets (or removes) a hyperlink on the selected text range. Pass `null` to remove a link.
+
+```typescript
+setLink("https://editneo.dev");
+setLink(null); // Remove link
+```
+
+#### `exportJSON()` / `importJSON(data)`
+
+Serialize and restore the document.
+
+```typescript
+const data = exportJSON();
+// data: { blocks: Record<string, NeoBlock>, rootBlocks: string[] }
+
+importJSON(data); // Replaces the current document
+```
+
 #### `undo()` / `redo()`
 
-Navigates through the history stack. `undo()` restores the previous state, `redo()` moves forward. Both are no-ops at the boundaries of histoy.
+Navigates through the history stack. `undo()` restores the previous state, `redo()` moves forward. Both are no-ops at the boundaries of history.
 
 ```typescript
 undo();
@@ -176,7 +222,7 @@ redo();
 
 ## History Model
 
-Every mutating action (`addBlock`, `updateBlock`, `deleteBlock`, `toggleMark`) captures a snapshot of `blocks`, `rootBlocks`, and `selection` before applying the change, and appends it to the `history` array. When `undo()` is called, the editor reverts to the snapshot at `historyIndex`. On `redo()`, it moves forward.
+Every mutating action captures a snapshot of `blocks`, `rootBlocks`, and `selection` before applying the change. `updateBlock` uses a 300ms debounce window — rapid edits to the same block within that window are grouped into a single undo step, preventing every keystroke from creating a snapshot.
 
 If a new action is performed after undoing, the forward history is discarded (standard undo stack behavior).
 

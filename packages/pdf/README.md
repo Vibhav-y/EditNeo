@@ -10,7 +10,7 @@ All processing happens locally — no files are uploaded to any server.
 npm install @editneo/pdf @editneo/core
 ```
 
-This package depends on [pdfjs-dist](https://github.com/nicolo-ribaudo/pdfjs-dist) for PDF parsing.
+This package depends on [pdfjs-dist](https://github.com/nicolo-ribaudo/pdfjs-dist) for PDF parsing. The pdf.js worker is auto-configured from CDN.
 
 ## Usage
 
@@ -29,7 +29,7 @@ Each returned block has a type inferred from the PDF content (paragraphs, headin
 
 ### With the React drop zone
 
-The `PDFDropZone` component from `@editneo/react` calls this function automatically when a user drops a PDF onto the editor. You only need this package directly if you want to handle PDF extraction yourself.
+The `PDFDropZone` component from `@editneo/react` calls this function automatically when a user drops a PDF onto the editor:
 
 ```tsx
 import { PDFDropZone } from "@editneo/react";
@@ -37,36 +37,54 @@ import { PDFDropZone } from "@editneo/react";
 <PDFDropZone>{/* editor content */}</PDFDropZone>;
 ```
 
+### Error handling
+
+The function provides clear error messages for common failures:
+
+```typescript
+try {
+  const blocks = await extractBlocksFromPdf(buffer);
+} catch (err) {
+  // Possible errors:
+  // "[EditNeo PDF] Cannot extract blocks: empty or missing PDF data"
+  // "[EditNeo PDF] This PDF is password-protected. Please provide an unlocked file."
+  // "[EditNeo PDF] Failed to load PDF: <reason>"
+  console.error(err.message);
+}
+```
+
+Per-page errors are caught individually — one corrupted page won't prevent the rest from extracting.
+
 ## How Extraction Works
 
 The extraction processes each page of the PDF in order and applies heuristics to convert raw PDF content into structured blocks.
 
 ### Text extraction
 
-PDF files don't have a concept of "paragraphs" or "headings" — they store positioned text fragments with font metadata. The extractor groups these fragments into blocks using two signals:
+PDF files don't have a concept of "paragraphs" or "headings" — they store positioned text fragments with font metadata. The extractor groups these fragments into blocks using vertical position gaps (>5 PDF units between lines starts a new block).
 
-1. **Vertical position:** When there's a significant vertical gap between consecutive text items (more than 5 PDF units), the extractor treats them as separate blocks.
+### Heading detection
 
-2. **Font size:** The extractor calculates the most common font size on each page (the "mode"). Text items significantly larger than the mode are classified as headings:
-   - Greater than 2x the mode font size: `heading-1`
-   - Greater than 1.5x the mode font size: `heading-2`
-   - Everything else: `paragraph`
+Headings are classified using multiple signals:
 
-### Image detection
+- **Font size ratio** — text significantly larger than the page's most common font size
+  - \>1.8× → `heading-1`
+  - \>1.4× → `heading-2`
+  - \>1.15× (if bold or all-caps) → `heading-3`
+- **Bold font name** — fonts with "Bold", "Heavy", or "Black" in the name
+- **Line length** — headings are typically shorter than 120 characters
+- **All-caps** — uppercase text at normal size with a bold font → `heading-3`
 
-The extractor scans each page's operator list for `PaintImageXObject` operations, which indicate rendered images. When found, an `image` block is added to the output.
+### Image extraction
 
-Note: Full image data extraction (decoding the pixel data from the PDF) requires additional processing of the operator list's argument arrays. The current implementation adds placeholder image blocks — proper image extraction can be implemented by processing `page.getOperatorList()` results in more detail.
+The extractor scans each page's operator list for `PaintImageXObject` operations. When found, the raw pixel data is read and converted to a PNG data URI via canvas. Small decorative images (<50×50px) are filtered out. In SSR environments where `document.createElement` isn't available, a placeholder is used instead.
 
 ### Limitations
-
-This is a heuristic-based extractor designed for common document layouts. Some things it does not handle perfectly:
 
 - **Multi-column layouts** — text from different columns may be merged or ordered incorrectly
 - **Tables** — table content is extracted as plain text, not as a structured table block
 - **Footnotes and headers/footers** — these are extracted as regular text blocks
 - **Scanned PDFs** — if the PDF contains only images (no text layer), the extractor produces only image blocks. OCR is not performed.
-- **Complex font detection** — bold and italic detection based on font name analysis is not yet implemented; all text is returned as plain spans
 
 ## API Reference
 
@@ -78,11 +96,14 @@ This is a heuristic-based extractor designed for common document layouts. Some t
 
 **Returns:** `Promise<NeoBlock[]>`
 
+**Throws:** `Error` with descriptive message on failure (empty data, password-protected, corrupt file).
+
 An array of `NeoBlock` objects in reading order. Each block has:
 
 - A generated UUID as its `id`
-- A `type` inferred from the content (`paragraph`, `heading-1`, `heading-2`, or `image`)
+- A `type` inferred from the content (`paragraph`, `heading-1`, `heading-2`, `heading-3`, or `image`)
 - A `content` array with a single `Span` containing the extracted text
+- Image blocks include `props.src` (data URI), `props.width`, and `props.height`
 - `createdAt` and `updatedAt` timestamps set to the extraction time
 
 ### Example output
@@ -115,7 +136,7 @@ Given a PDF with a title, some body text, and an image, the function might retur
     id: "g7h8i9...",
     type: "image",
     content: [{ text: "" }],
-    props: { src: "placeholder-image-url" },
+    props: { src: "data:image/png;base64,...", width: 640, height: 480 },
     children: [],
     parentId: null,
     createdAt: 1707840000000,

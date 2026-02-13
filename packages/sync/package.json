@@ -1,9 +1,17 @@
 {
   "name": "@editneo/sync",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Yjs-based CRDT sync manager for EditNeo with offline and WebSocket support",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc",

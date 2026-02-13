@@ -3,7 +3,7 @@ export type BlockType =
   | 'heading-1' | 'heading-2' | 'heading-3' 
   | 'bullet-list' | 'ordered-list' | 'todo-list' 
   | 'code-block' 
-  | 'image' | 'video' | 'pdf-page' 
+  | 'image' | 'video' 
   | 'quote' | 'divider' | 'callout';
 
 export interface Span {

@@ -15,23 +15,28 @@ The `SyncManager` creates a Yjs document and maps the editor's block structure i
 - A `Y.Map` for individual blocks (keyed by block ID)
 - A `Y.Array` for the ordered list of root block IDs
 
-Changes flow in both directions:
+Changes flow **bidirectionally** and automatically:
 
-1. **Local to remote:** When the user edits a block through the store, your code calls `syncBlock()` or `syncRoot()` to push the change into the Yjs document. The Yjs providers then propagate it to IndexedDB and to other connected clients.
+1. **Store → Yjs:** When you mutate the editor store, the `SyncManager` detects the change via Zustand's `subscribe()` and pushes it to Yjs. Only changed blocks are synced, and deletions are tracked. The Yjs providers then propagate changes to IndexedDB and to other connected clients.
 
-2. **Remote to local:** When a change arrives from another client (or from IndexedDB on page load), the `SyncManager`'s observers detect the Yjs mutation and update the Zustand store accordingly.
+2. **Yjs → Store:** When a change arrives from another client (or from IndexedDB on page load), the `SyncManager`'s observers detect the Yjs mutation and update the Zustand store.
+
+An `isSyncing` flag prevents infinite loops between the two directions. All updates are wrapped in Yjs transactions for atomicity.
 
 Because Yjs is a CRDT, conflicting edits from multiple users are merged automatically without a central server making decisions.
 
 ## Usage
 
-### Basic (offline only)
+### Standalone (offline only)
 
 ```typescript
 import { SyncManager } from "@editneo/sync";
+import { createEditorStore } from "@editneo/core";
 
+const store = createEditorStore();
 const sync = new SyncManager("my-document");
-// Data is now persisted to IndexedDB under the key "editneo-document-my-document"
+sync.bindStore(store);
+// Data is now persisted to IndexedDB under "editneo-document-my-document"
 ```
 
 ### With real-time collaboration
@@ -41,66 +46,67 @@ const sync = new SyncManager("my-document", {
   url: "wss://your-yjs-server.com",
   room: "my-document",
 });
+sync.bindStore(store);
 ```
 
 The `url` should point to a [y-websocket](https://github.com/yjs/y-websocket) server. The `room` determines which document the client joins — clients in the same room share the same Yjs document.
 
-### Syncing local changes
+### With `<NeoEditor />` (recommended)
 
-After the store modifies a block, push the change to Yjs:
+When used with `@editneo/react`, the `NeoEditor` component creates and binds the `SyncManager` automatically when you pass `syncConfig`:
 
-```typescript
-import { useEditorStore } from "@editneo/core";
-
-// After updating a block in the store
-const updatedBlock = useEditorStore.getState().blocks["block-123"];
-sync.syncBlock(updatedBlock);
-
-// After reordering root blocks
-const rootBlocks = useEditorStore.getState().rootBlocks;
-sync.syncRoot(rootBlocks);
-
-// After deleting a block
-sync.deleteBlock("block-123");
+```tsx
+<NeoEditor
+  id="shared-doc"
+  syncConfig={{ url: "wss://your-server.com", room: "shared-doc" }}
+>
+  <CursorOverlay />
+</NeoEditor>
 ```
-
-These methods include basic deduplication: they compare the incoming data against what Yjs currently holds and skip the write if nothing changed. This prevents trivial feedback loops where a Yjs observer fires a store update, which then tries to write back to Yjs.
 
 ### Cursor awareness
 
-When a WebSocket provider is active, you can access the [Yjs Awareness](https://docs.yjs.dev/getting-started/adding-awareness) instance to share cursor positions between users:
+Share cursor positions and user info between collaborators:
 
 ```typescript
+// Set your user info
+sync.setUser({
+  name: "Alice",
+  color: "#3b82f6",
+  avatar: "https://example.com/alice.jpg", // optional
+});
+
+// Update cursor position
+sync.setCursor("block-abc", 12); // blockId, character index
+sync.setCursor(null); // Clear cursor (e.g. on blur)
+
+// Listen for remote cursor changes
 const awareness = sync.awareness;
-
-if (awareness) {
-  // Set local cursor state
-  awareness.setLocalStateField("cursor", {
-    blockId: "block-abc",
-    offset: 12,
-    name: "Alice",
-    color: "#3b82f6",
-  });
-
-  // Listen for remote cursor changes
-  awareness.on("change", () => {
-    const states = awareness.getStates();
-    // states is a Map<clientID, { cursor: { blockId, offset, name, color } }>
-  });
-}
+awareness?.on("change", () => {
+  const states = awareness.getStates();
+  // Map<clientID, { user: { name, color }, cursor: { blockId, index } }>
+});
 ```
 
 The `CursorOverlay` component from `@editneo/react` consumes this awareness data automatically.
 
+### Error handling
+
+The `SyncManager` listens for connection events and logs status changes:
+
+- `status` — connection state changes (connecting, connected, disconnected)
+- `connection-error` — WebSocket errors
+- `connection-close` — connection closed (auto-reconnect is handled by y-websocket)
+
 ### Cleanup
 
-When the editor unmounts or the document changes, destroy the sync manager to close connections and free resources:
+When the editor unmounts or the document changes, destroy the sync manager:
 
 ```typescript
 sync.destroy();
 ```
 
-This destroys the IndexedDB provider, the WebSocket provider (if any), and the underlying Yjs document.
+This unsubscribes from the store, destroys the IndexedDB provider, the WebSocket provider (if any), and the underlying Yjs document.
 
 ## API Reference
 
@@ -110,6 +116,15 @@ This destroys the IndexedDB provider, the WebSocket provider (if any), and the u
 | ------------ | ------------------------------- | --------------------------------------------------------------------- |
 | `docId`      | `string`                        | Unique document identifier. Used to namespace the IndexedDB database. |
 | `syncConfig` | `{ url: string; room: string }` | Optional. WebSocket server URL and room name for real-time sync.      |
+
+### Instance Methods
+
+| Method      | Signature                                                          | Description                                        |
+| ----------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| `bindStore` | `(store: EditorStoreInstance) => void`                             | Binds the sync manager to an editor store instance |
+| `setUser`   | `(user: { name: string; color: string; avatar?: string }) => void` | Sets local user awareness info                     |
+| `setCursor` | `(blockId: string \| null, index?: number) => void`                | Updates local cursor position in awareness         |
+| `destroy`   | `() => void`                                                       | Tears down all providers and the Yjs document      |
 
 ### Instance Properties
 
@@ -121,15 +136,6 @@ This destroys the IndexedDB provider, the WebSocket provider (if any), and the u
 | `provider`   | `IndexeddbPersistence`           | The IndexedDB persistence provider                 |
 | `wsProvider` | `WebsocketProvider \| undefined` | The WebSocket provider, if configured              |
 | `awareness`  | `Awareness \| undefined`         | The awareness instance from the WebSocket provider |
-
-### Instance Methods
-
-| Method        | Signature                        | Description                                     |
-| ------------- | -------------------------------- | ----------------------------------------------- |
-| `syncBlock`   | `(block: NeoBlock) => void`      | Pushes a block update to Yjs (with dedup check) |
-| `syncRoot`    | `(rootBlocks: string[]) => void` | Replaces the root block ordering in Yjs         |
-| `deleteBlock` | `(id: string) => void`           | Removes a block from the Yjs map                |
-| `destroy`     | `() => void`                     | Tears down all providers and the Yjs document   |
 
 ## Running a WebSocket Server
 
