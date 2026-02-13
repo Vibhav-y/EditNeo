@@ -1,6 +1,6 @@
 {
   "name": "@editneo/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React components for EditNeo — NeoEditor, Aeropeak, SlashMenu, and more",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
