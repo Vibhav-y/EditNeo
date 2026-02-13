@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { extractBlocksFromPdf } from '@editneo/pdf'; // We'll need to export this or handle worker loading
-import { useEditorStore } from '@editneo/core';
+import { useEditorStore, NeoBlock } from '@editneo/core';
 import { useEditor } from '../hooks';
 
 interface PDFDropZoneProps {
@@ -50,7 +50,7 @@ export const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       // We need to ensure @editneo/pdf exports this.
       try {
         const blocks = await extractBlocksFromPdf(buffer);
-        blocks.forEach(block => {
+        blocks.forEach((block: NeoBlock) => {
              // We need a way to add a full block with content, not just type.
              // store.addBlock currently only takes type. 
              // We need to enhance store.addBlock or add a new action `insertBlock` that takes a full block.

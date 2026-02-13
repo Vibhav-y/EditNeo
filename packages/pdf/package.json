@@ -1,9 +1,17 @@
 {
   "name": "@editneo/pdf",
   "version": "0.1.0",
-  "private": true,
-  "main": "./src/worker.ts",
-  "types": "./src/worker.ts",
+  "description": "PDF transmutation engine for EditNeo — converts PDFs into editable blocks",
+  "main": "./dist/worker.js",
+  "types": "./dist/worker.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "pdfjs-dist": "3.11.174",
     "@editneo/core": "*"
@@ -11,5 +19,6 @@
   "devDependencies": {
     "typescript": "^5.3.3",
     "@types/pdfjs-dist": "^2.10.378"
-  }
+  },
+  "license": "MIT"
 }

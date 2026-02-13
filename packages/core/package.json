@@ -1,9 +1,17 @@
 {
   "name": "@editneo/core",
   "version": "0.1.0",
-  "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "description": "Core engine for EditNeo — block-based editor with CRDT sync",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "zustand": "^4.5.1",
     "uuid": "^9.0.1",
@@ -13,5 +21,6 @@
     "typescript": "^5.3.3",
     "@types/uuid": "^9.0.8",
     "@types/node": "^20.11.24"
-  }
+  },
+  "license": "MIT"
 }

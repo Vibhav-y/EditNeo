@@ -1,0 +1,82 @@
+﻿node.exe : 
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Users\vibhav\AppData\Roaming ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: (:String) [], RemoteExce  
+  ption
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 
+Attention:
+Turborepo now collects completely 
+anonymous telemetry regarding usage.
+This information is used to shape 
+the Turborepo roadmap and prioritize 
+features.
+You can learn more, including how to 
+opt-out if you'd not like to 
+participate in this anonymous 
+program, by visiting the following 
+URL:
+https://turborepo.dev/docs/telemetry
+
+ΓÇó turbo 2.8.7
+ΓÇó Packages in scope: @editneo/core, @editneo/pdf, @editneo/react, @editneo/sync, @editneo/ui-kit
+ΓÇó Running build in 5 packages
+ΓÇó Remote caching disabled
+@editneo/core:build: cache miss, executing b1af9aa7d4b82999
+@editneo/core:build: 
+@editneo/core:build: > @editneo/core@0.1.0 build
+@editneo/core:build: > tsc
+@editneo/core:build: 
+@editneo/core:build: npm notice
+@editneo/core:build: npm notice New minor version of npm available! 11.6.2 -> 11.10.0
+@editneo/core:build: npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.0
+@editneo/core:build: npm notice To update run: npm install -g npm@11.10.0
+@editneo/core:build: npm notice
+@editneo/pdf:build: cache miss, executing 065e607a56a46914
+@editneo/react:build: cache miss, executing 06453aa971b42102
+@editneo/sync:build: cache miss, executing cc0ddee017b425e1
+@editneo/pdf:build: 
+@editneo/pdf:build: > @editneo/pdf@0.1.0 build
+@editneo/pdf:build: > tsc
+@editneo/pdf:build: 
+@editneo/sync:build: 
+@editneo/sync:build: > @editneo/sync@0.1.0 build
+@editneo/sync:build: > tsc
+@editneo/sync:build: 
+@editneo/react:build: 
+@editneo/react:build: > @editneo/react@0.1.0 build
+@editneo/react:build: > tsc
+@editneo/react:build: 
+@editneo/react:build: src/components/PDFDropZone.tsx(2,38): error TS2307: Cannot find module '@editneo/pdf' or its corresponding type declarations.
+@editneo/react:build: src/components/PDFDropZone.tsx(53,24): error TS7006: Parameter 'block' implicitly has an 'any' type.
+@editneo/react:build: src/NeoEditor.tsx(3,29): error TS2307: Cannot find module '@editneo/sync' or its corresponding type declarations.
+@editneo/react:build: npm error Lifecycle script `build` failed with error:
+@editneo/react:build: npm error code 2
+@editneo/react:build: npm error path D:\EditNeo\packages\react
+@editneo/react:build: npm error workspace @editneo/react@0.1.0
+@editneo/react:build: npm error location D:\EditNeo\packages\react
+@editneo/react:build: npm error command failed
+@editneo/react:build: npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsc
+@editneo/react:build: ERROR: command 
+finished with error: command 
+(D:\EditNeo\packages\react) 
+C:\Program Files\nodejs\npm.cmd run 
+build exited (2)
+@editneo/react#build: command 
+(D:\EditNeo\packages\react) 
+C:\Program Files\nodejs\npm.cmd run 
+build exited (2)
+
+ Tasks:    3 successful, 4 total
+Cached:    0 cached, 4 total
+  Time:    11.285s 
+Failed:    @editneo/react#build
+
+ ERROR  run failed: command  exited 
+(2)
