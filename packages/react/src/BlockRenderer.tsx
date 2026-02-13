@@ -15,9 +15,11 @@ import { DividerBlock } from './blocks/DividerBlock';
 
 interface BlockRendererProps {
   block: NeoBlock;
+  /** Auto-computed order for ordered-list blocks. */
+  order?: number;
 }
 
-export const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
+export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, order }) => {
   const context = useContext(EditorContext);
 
   // Allow user override
@@ -26,10 +28,10 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
     if (customRender) return <>{customRender}</>;
   }
 
-  return <DefaultRender block={block} />;
+  return <DefaultRender block={block} order={order} />;
 };
 
-const DefaultRender: React.FC<BlockRendererProps> = ({ block }) => {
+const DefaultRender: React.FC<BlockRendererProps> = ({ block, order }) => {
   switch (block.type) {
     case 'heading-1':
     case 'heading-2':
@@ -38,7 +40,7 @@ const DefaultRender: React.FC<BlockRendererProps> = ({ block }) => {
     case 'bullet-list':
     case 'ordered-list':
     case 'todo-list':
-      return <ListBlock block={block} />;
+      return <ListBlock block={block} order={order} />;
     case 'image':
     case 'video':
       return <MediaBlock block={block} />;

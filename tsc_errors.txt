@@ -1,2 +1,0 @@
-﻿packages/react/src/components/PDFDropZone.tsx(49,55): error TS2307: Cannot find module '@editneo/pdf' or its corresponding type declarations.
-packages/react/src/NeoEditor.tsx(70,12): error TS2307: Cannot find module '@editneo/sync' or its corresponding type declarations.

@@ -99,6 +99,7 @@ export interface EditorActions {
   deleteBlock: (id: string) => void;
   moveBlock: (id: string, afterId: string | null) => void;
   setBlockType: (id: string, newType: BlockType) => void;
+  setSelection: (blockId: string | null, startOffset: number, endOffset: number) => void;
   toggleMark: (mark: keyof Pick<Span, 'bold' | 'italic' | 'underline' | 'strike' | 'code'>) => void;
   setLink: (url: string | null) => void;
   undo: () => void;
@@ -155,6 +156,13 @@ export function createEditorStore() {
         history: state.history,
       };
     }),
+
+    // ── Selection ──────────────────────────────────────────────────
+
+    setSelection: (blockId, startOffset, endOffset) =>
+      set(() => ({
+        selection: { blockId, startOffset, endOffset },
+      })),
 
     // ── Block CRUD ─────────────────────────────────────────────────
 
@@ -428,9 +436,3 @@ export function createEditorStore() {
 
 /** The type returned by createEditorStore() */
 export type EditorStoreInstance = ReturnType<typeof createEditorStore>;
-
-/**
- * @deprecated Use createEditorStore() + context pattern instead.
- * Kept for backward compatibility — this is a global singleton.
- */
-export const useEditorStore = createEditorStore();

@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { useStore } from 'zustand';
 import { EditorStore } from '@editneo/core';
 import { EditorContext } from './NeoEditor';
@@ -37,8 +37,32 @@ export const useSelection = () => {
 
 /**
  * Returns the current sync connection status.
+ * Reflects real WebSocket state: 'connecting' | 'connected' | 'disconnected'.
  */
-export const useSyncStatus = () => {
+export const useSyncStatus = (): 'connecting' | 'connected' | 'disconnected' => {
   const context = useContext(EditorContext);
-  return context?.syncManager ? 'connected' : 'disconnected';
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+
+  useEffect(() => {
+    const manager = context?.syncManager;
+    if (!manager) {
+      setStatus('disconnected');
+      return;
+    }
+
+    // Read initial status
+    if (typeof manager.getStatus === 'function') {
+      setStatus(manager.getStatus());
+    }
+
+    // Subscribe to changes
+    if (typeof manager.onStatusChange === 'function') {
+      const unsubscribe = manager.onStatusChange((newStatus: string) => {
+        setStatus(newStatus as any);
+      });
+      return unsubscribe;
+    }
+  }, [context?.syncManager]);
+
+  return status;
 };

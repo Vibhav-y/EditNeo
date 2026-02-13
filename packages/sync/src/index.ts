@@ -8,6 +8,8 @@ export interface SyncConfig {
   room: string;
 }
 
+export type SyncStatus = 'connecting' | 'connected' | 'disconnected';
+
 export class SyncManager {
   doc: Y.Doc;
   yBlocks: Y.Map<any>;
@@ -17,6 +19,8 @@ export class SyncManager {
   private store?: EditorStoreInstance;
   private unsubscribeStore?: () => void;
   private isSyncing = false; // (#32) Transaction flag to prevent loops
+  private _status: SyncStatus = 'disconnected';
+  private _statusListeners: Array<(status: SyncStatus) => void> = [];
 
   constructor(docId: string = 'default', syncConfig?: SyncConfig) {
     this.doc = new Y.Doc();
@@ -31,15 +35,23 @@ export class SyncManager {
       this.wsProvider = new WebsocketProvider(syncConfig.url, syncConfig.room, this.doc);
       
       // (#30) Connection status and error handling
+      this._status = 'connecting';
       this.wsProvider.on('status', (event: any) => {
+        const newStatus: SyncStatus = event.status === 'connected' ? 'connected' : 'disconnected';
+        this._status = newStatus;
+        this._statusListeners.forEach(fn => fn(newStatus));
         console.log('[EditNeo Sync] Status:', event.status);
       });
 
       this.wsProvider.on('connection-error', (event: any) => {
+        this._status = 'disconnected';
+        this._statusListeners.forEach(fn => fn('disconnected'));
         console.warn('[EditNeo Sync] Connection error:', event);
       });
 
-      this.wsProvider.on('connection-close', (event: any) => {
+      this.wsProvider.on('connection-close', (_event: any) => {
+        this._status = 'connecting'; // will auto-reconnect
+        this._statusListeners.forEach(fn => fn('connecting'));
         console.log('[EditNeo Sync] Connection closed, will auto-reconnect');
       });
     }
@@ -98,19 +110,57 @@ export class SyncManager {
 
   /**
    * (#31) Apply minimal inserts/deletes to a Y.Array instead of replacing everything.
+   * Uses a simple forward diff — handles most common operations (single insert, delete, move)
+   * with targeted Y.Array mutations to preserve CRDT history.
    */
-  private updateYArraySurgically(yArray: Y.Array<string>, oldArr: string[], newArr: string[]) {
-    // Simple diff: find minimal operations
+  private updateYArraySurgically(yArray: Y.Array<string>, _oldArr: string[], newArr: string[]) {
     const currentY = yArray.toJSON() as string[];
     
     // If they already match, skip
     if (JSON.stringify(currentY) === JSON.stringify(newArr)) return;
 
-    // For correctness, just replace; the real CRDT benefit is that this runs inside
-    // a single transaction, so it's merged atomically.
-    // A full LCS-based diff is overkill for typical block operations (single insert/delete).
-    yArray.delete(0, yArray.length);
-    yArray.push(newArr);
+    // Build a simple LCS-based diff
+    const m = currentY.length;
+    const n = newArr.length;
+
+    // LCS table
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = currentY[i - 1] === newArr[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+
+    // Backtrack to find operations
+    const ops: Array<{ type: 'keep' | 'delete' | 'insert'; value: string }> = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && currentY[i - 1] === newArr[j - 1]) {
+        ops.unshift({ type: 'keep', value: currentY[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        ops.unshift({ type: 'insert', value: newArr[j - 1] });
+        j--;
+      } else {
+        ops.unshift({ type: 'delete', value: currentY[i - 1] });
+        i--;
+      }
+    }
+
+    // Apply operations to Y.Array with positional tracking
+    let pos = 0;
+    for (const op of ops) {
+      if (op.type === 'keep') {
+        pos++;
+      } else if (op.type === 'delete') {
+        yArray.delete(pos, 1);
+      } else if (op.type === 'insert') {
+        yArray.insert(pos, [op.value]);
+        pos++;
+      }
+    }
   }
 
   private setupObservers() {
@@ -165,5 +215,18 @@ export class SyncManager {
 
   get awareness() {
     return this.wsProvider?.awareness;
+  }
+
+  /** Get the current sync connection status. */
+  getStatus(): SyncStatus {
+    return this._status;
+  }
+
+  /** Register a listener for connection status changes. Returns unsubscribe function. */
+  onStatusChange(listener: (status: SyncStatus) => void): () => void {
+    this._statusListeners.push(listener);
+    return () => {
+      this._statusListeners = this._statusListeners.filter(fn => fn !== listener);
+    };
   }
 }

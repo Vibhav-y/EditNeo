@@ -1,6 +1,6 @@
 {
   "name": "@editneo/core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Core engine for EditNeo — block-based editor with CRDT sync",
   "type": "module",
   "main": "./dist/index.js",

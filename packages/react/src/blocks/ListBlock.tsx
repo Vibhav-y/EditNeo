@@ -4,7 +4,13 @@ import { useStore } from 'zustand';
 import { EditableBlock } from '../EditableBlock';
 import { EditorContext } from '../NeoEditor';
 
-export const ListBlock: React.FC<{ block: NeoBlock }> = ({ block }) => {
+interface ListBlockProps {
+  block: NeoBlock;
+  /** Auto-computed order for ordered-list blocks. */
+  order?: number;
+}
+
+export const ListBlock: React.FC<ListBlockProps> = ({ block, order }) => {
   const isOrdered = block.type === 'ordered-list';
   const isTodo = block.type === 'todo-list';
   const context = useContext(EditorContext);
@@ -18,11 +24,14 @@ export const ListBlock: React.FC<{ block: NeoBlock }> = ({ block }) => {
     }
   };
 
+  // (#27a) Use computed order from parent, fall back to props, then 1
+  const displayOrder = order ?? block.props?.order ?? 1;
+
   return (
     <div className="neo-list-item" style={{ display: 'flex', alignItems: 'flex-start', marginLeft: '1.5em' }}>
       <span style={{ marginRight: '0.5em', userSelect: 'none', flexShrink: 0, marginTop: '4px' }}>
         {isOrdered
-          ? `${(block.props?.order ?? 1)}.`
+          ? `${displayOrder}.`
           : isTodo
           ? <input
               type="checkbox"

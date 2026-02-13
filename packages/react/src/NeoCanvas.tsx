@@ -1,8 +1,30 @@
 import React, { useRef, useContext } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { NeoBlock } from '@editneo/core';
 import { useStore } from 'zustand';
 import { EditorContext } from './NeoEditor';
 import { BlockRenderer } from './BlockRenderer';
+
+/**
+ * (#27a) Compute the sequential order for an ordered-list block.
+ * Counts consecutive ordered-list blocks backwards from the given index.
+ */
+function computeOrder(
+  rootBlocks: string[],
+  blocks: Record<string, NeoBlock>,
+  index: number
+): number | undefined {
+  const block = blocks[rootBlocks[index]];
+  if (!block || block.type !== 'ordered-list') return undefined;
+
+  let order = 1;
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = blocks[rootBlocks[i]];
+    if (!prev || prev.type !== 'ordered-list') break;
+    order++;
+  }
+  return order;
+}
 
 export const NeoCanvas: React.FC = () => {
   const context = useContext(EditorContext);
@@ -78,8 +100,8 @@ export const NeoCanvas: React.FC = () => {
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
-              {/* (#10) Route through BlockRenderer instead of EditableBlock directly */}
-              <BlockRenderer block={block} />
+              {/* (#27a) Compute order for ordered-list blocks */}
+              <BlockRenderer block={block} order={computeOrder(rootBlocks, blocks, virtualRow.index)} />
             </div>
           );
         })}

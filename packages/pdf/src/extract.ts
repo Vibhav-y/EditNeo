@@ -14,8 +14,9 @@ function ensureWorkerConfigured() {
       pdfjs.GlobalWorkerOptions.workerSrc =
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
     } catch {
-      // Fallback: disable worker (runs on main thread, slower but works)
-      (pdfjs as any).disableWorker = true;
+      // Fallback: empty string disables worker (runs on main thread, slower but works)
+      // Note: do NOT use `pdfjs.disableWorker = true` — it's an illegal ESM reassignment
+      pdfjs.GlobalWorkerOptions.workerSrc = '';
     }
   }
 }
